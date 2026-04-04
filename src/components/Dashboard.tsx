@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Vote, Users, CheckCircle, TrendingUp } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { supabase } from '../lib/supabase';
+import { storage } from '../lib/storage';
 
 interface Stats {
   totalVotes: number;
@@ -22,43 +22,38 @@ export function Dashboard() {
 
   useEffect(() => {
     loadStats();
+    const interval = setInterval(loadStats, 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  const loadStats = async () => {
+  const loadStats = () => {
     try {
-      const [electionsRes, candidatesRes, votesRes] = await Promise.all([
-        supabase.from('elections').select('*'),
-        supabase.from('candidates').select('*'),
-        supabase.from('votes').select('*'),
-      ]);
+      const elections = storage.getElections();
+      const candidates = storage.getCandidates();
+      const votes = storage.getVotes();
 
       const now = new Date();
-      const activeElections = electionsRes.data?.filter((e) => {
+      const activeElections = elections.filter((e) => {
         const start = new Date(e.start_date);
         const end = new Date(e.end_date);
         return start <= now && now <= end;
-      }).length || 0;
+      }).length;
 
       setStats({
-        totalVotes: votesRes.data?.length || 0,
-        totalCandidates: candidatesRes.data?.length || 0,
+        totalVotes: votes.length,
+        totalCandidates: candidates.length,
         activeElections,
-        totalElections: electionsRes.data?.length || 0,
+        totalElections: elections.length,
       });
 
-      const recentElections = electionsRes.data?.slice(0, 5) || [];
-      const chartData = await Promise.all(
-        recentElections.map(async (election) => {
-          const { data } = await supabase
-            .from('votes')
-            .select('*')
-            .eq('election_id', election.id);
-          return {
-            name: election.title.substring(0, 15),
-            votes: data?.length || 0,
-          };
-        })
-      );
+      const recentElections = elections.slice(0, 5);
+      const chartData = recentElections.map((election) => {
+        const electionVotes = votes.filter((v) => v.election_id === election.id);
+        return {
+          name: election.title.substring(0, 15),
+          votes: electionVotes.length,
+        };
+      });
       setChartData(chartData);
     } catch (error) {
       console.error('Error loading stats:', error);

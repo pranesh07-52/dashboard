@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, Eye, Calendar, Users } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { Plus, Trash2, Eye, Calendar } from 'lucide-react';
+import { storage } from '../lib/storage';
 
 interface Election {
   id: string;
@@ -30,15 +30,10 @@ export function Elections({ onViewResults }: ElectionsProps) {
     loadElections();
   }, []);
 
-  const loadElections = async () => {
+  const loadElections = () => {
     try {
-      const { data, error } = await supabase
-        .from('elections')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setElections(data || []);
+      const data = storage.getElections();
+      setElections([...data].reverse());
     } catch (error) {
       console.error('Error loading elections:', error);
     } finally {
@@ -46,12 +41,10 @@ export function Elections({ onViewResults }: ElectionsProps) {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from('elections').insert([formData]);
-      if (error) throw error;
-
+      storage.addElection(formData);
       setFormData({ title: '', description: '', start_date: '', end_date: '' });
       setShowForm(false);
       loadElections();
@@ -60,12 +53,11 @@ export function Elections({ onViewResults }: ElectionsProps) {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!confirm('Are you sure you want to delete this election?')) return;
 
     try {
-      const { error } = await supabase.from('elections').delete().eq('id', id);
-      if (error) throw error;
+      storage.deleteElection(id);
       loadElections();
     } catch (error) {
       console.error('Error deleting election:', error);

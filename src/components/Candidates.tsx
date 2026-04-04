@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, User } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { Plus, Trash2 } from 'lucide-react';
+import { storage } from '../lib/storage';
 
 interface Candidate {
   id: string;
@@ -35,15 +35,13 @@ export function Candidates() {
     loadData();
   }, []);
 
-  const loadData = async () => {
+  const loadData = () => {
     try {
-      const [candidatesRes, electionsRes] = await Promise.all([
-        supabase.from('candidates').select('*').order('created_at', { ascending: false }),
-        supabase.from('elections').select('id, title').order('created_at', { ascending: false }),
-      ]);
+      const candidatesData = storage.getCandidates();
+      const electionsData = storage.getElections();
 
-      setCandidates(candidatesRes.data || []);
-      setElections(electionsRes.data || []);
+      setCandidates([...candidatesData].reverse());
+      setElections([...electionsData].reverse());
     } catch (error) {
       console.error('Error loading data:', error);
     } finally {
@@ -51,12 +49,10 @@ export function Candidates() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const { error } = await supabase.from('candidates').insert([formData]);
-      if (error) throw error;
-
+      storage.addCandidate(formData);
       setFormData({ election_id: '', name: '', description: '', emoji: '👤' });
       setShowForm(false);
       loadData();
@@ -65,12 +61,11 @@ export function Candidates() {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     if (!confirm('Are you sure you want to delete this candidate?')) return;
 
     try {
-      const { error } = await supabase.from('candidates').delete().eq('id', id);
-      if (error) throw error;
+      storage.deleteCandidate(id);
       loadData();
     } catch (error) {
       console.error('Error deleting candidate:', error);

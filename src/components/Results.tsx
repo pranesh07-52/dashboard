@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Download, ArrowLeft, Trophy } from 'lucide-react';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
-import { supabase } from '../lib/supabase';
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { storage } from '../lib/storage';
 
 interface ResultsProps {
   electionId: string;
@@ -26,17 +26,14 @@ export function Results({ electionId, electionTitle, onBack }: ResultsProps) {
 
   useEffect(() => {
     loadResults();
+    const interval = setInterval(loadResults, 1000);
+    return () => clearInterval(interval);
   }, [electionId]);
 
-  const loadResults = async () => {
+  const loadResults = () => {
     try {
-      const [candidatesRes, votesRes] = await Promise.all([
-        supabase.from('candidates').select('*').eq('election_id', electionId),
-        supabase.from('votes').select('*').eq('election_id', electionId),
-      ]);
-
-      const candidates = candidatesRes.data || [];
-      const votes = votesRes.data || [];
+      const candidates = storage.getCandidates().filter((c) => c.election_id === electionId);
+      const votes = storage.getVotes().filter((v) => v.election_id === electionId);
       const total = votes.length;
 
       const voteCounts = votes.reduce((acc, vote) => {
